@@ -20,6 +20,9 @@ class NormalizeByChannelMeanStd(torch.nn.Module):
     def extra_repr(self):
         return 'mean={}, std={}'.format(self.mean, self.std)
 
+    def get_params(self):
+        return self.mean, self.std
+
 
 def cifar10_dataloader(batch_size=64, data_dir='./data/', val_ratio=0.1):
     '''CIFAR10 dataloader for training and testing'''
