@@ -123,7 +123,7 @@ def main():
         for i, (X, y) in enumerate(tqdm(train_loader)):
             X = X.cuda()
             y = y.cuda()
-            delta = torch.zeros(args.batch_size, 3, 32, 32).cuda()
+            delta = torch.zeros(X.size(0), 3, 32, 32).cuda()
             for j in range(len(epsilon)):
                 delta[:, j, :, :].uniform_(-epsilon[j][0][0].item(), epsilon[j][0][0].item())
 
