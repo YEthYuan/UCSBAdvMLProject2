@@ -79,12 +79,16 @@ def main():
 
     epsilon = (args.eps / 255.) / std
     alpha = (args.alpha / 255.) / std
-    upper_limit = ((1 - mean) / std)
-    lower_limit = ((0 - mean) / std)
-    delta = torch.zeros(args.batch_size, 3, 32, 32).cuda()
-    delta.requires_grad = True
+    upper_limit = ((1 - mean) / std).cuda()
+    lower_limit = ((0 - mean) / std).cuda()
+    epsilon = epsilon.view(3, 1, 1).cuda()
+    alpha = alpha.view(3, 1, 1).cuda()
+    lower_limit = lower_limit.view(3, 1, 1)
+    upper_limit = upper_limit.view(3, 1, 1)
 
-    model = ResNet18()
+    # print(epsilon)
+
+    model = ResNet18().cuda()
     # be lazy...
     opt = torch.optim.SGD(model.parameters(), args.lr, args.momentum, weight_decay=args.weight_decay)
     criterion = nn.CrossEntropyLoss()
@@ -119,9 +123,17 @@ def main():
         for i, (X, y) in enumerate(tqdm(train_loader)):
             X = X.cuda()
             y = y.cuda()
+            delta = torch.zeros(args.batch_size, 3, 32, 32).cuda()
             for j in range(len(epsilon)):
                 delta[:, j, :, :].uniform_(-epsilon[j][0][0].item(), epsilon[j][0][0].item())
+
+            # print("delta.shape:", delta.shape)
+            # print("X.shape:", X.shape)
+            # print("lower_limit.shape:", lower_limit.shape)
+            # print("upper_limit.shape:", upper_limit.shape)
+
             delta.data = torch.clamp(delta, lower_limit - X, upper_limit - X)
+            delta.requires_grad = True
 
             if args.train_method == 'fat':
                 output = model(X + delta[:X.size(0)])
@@ -132,11 +144,17 @@ def main():
                 delta.data[:X.size(0)] = torch.clamp(delta[:X.size(0)], lower_limit - X, upper_limit - X)
 
             elif args.train_method == 'at':
-                for _ in range(args.attack_iters):
+                for _ in range(args.attack_step):
                     output = model(X + delta)
                     loss = criterion(output, y)
                     loss.backward()
                     grad = delta.grad.detach()
+
+                    # print(delta.shape)
+                    # print(alpha.shape)
+                    # print(grad.shape)
+                    # print(epsilon.shape)
+
                     delta.data = torch.clamp(delta + alpha * torch.sign(grad), -epsilon, epsilon)
                     delta.data = torch.clamp(delta, lower_limit - X, upper_limit - X)
                     delta.grad.zero_()
