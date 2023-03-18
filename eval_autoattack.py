@@ -45,7 +45,7 @@ def main():
     # model = model.to(args.device)
 
     checkpoint = torch.load(args.model_path)
-    model.load_state_dict(checkpoint['state_dict'])
+    model.load_state_dict(checkpoint['state_dict'], strict=False)
     model = model.to(args.device)
 
     ## Make sure the model is in `eval` mode.
