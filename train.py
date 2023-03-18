@@ -37,14 +37,14 @@ def parse_args():
         '--norm', type=str, default='Linf', choices=['Linf', 'L2', 'L1'], help='Norm to use for attack'
     )
     parser.add_argument(
-        "--train_method", type=str, default="at", choices=['at', 'fat'],
+        "--train_method", type=str, default="fat", choices=['at', 'fat'],
         help="Adversarial Training or Fast Adversarial Training"
     )
     parser.add_argument(
         '--data_dir', default='./data/', type=str, help="Folder to store downloaded dataset"
     )
     parser.add_argument(
-        '--save_dir', default='./out/at/', help='Filepath to the trained model'
+        '--save_dir', default='./out/fat/', help='Filepath to the trained model'
     )
     parser.add_argument(
         '--batch_size', type=int, default=1024, help='Batch size for attack'
