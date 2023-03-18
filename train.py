@@ -95,6 +95,7 @@ def main():
     test_acc_best_pgd = 0
 
     results = {
+        "epoch": [],
         "train_loss": [],
         "train_acc": [],
         "val_loss": [],
@@ -107,7 +108,9 @@ def main():
     start_train_time = time.time()
 
     for epoch in range(0, args.epochs):
+        results['epoch'].append(epoch)
         logger.info(f"Epoch {epoch} starts ...")
+
         logger.info("Training ...")
         model.train()
         train_loss = 0
@@ -170,3 +173,41 @@ def main():
                 val_loss += loss.item() * y.size(0)
                 val_acc += (output.max(1)[1] == y).sum().item()
                 val_n += y.size(0)
+
+        results['val_loss'].append(val_loss / val_n)
+        results['val_acc'].append(val_acc / val_n)
+        logger.info(f"Epoch: {epoch}")
+        logger.info(f"Validation Loss: {val_loss / val_n}")
+        logger.info(f"Validation Acc: {val_acc / val_n}")
+
+        logger.info("Evaluating the robust accuracy ...")
+        adv_val_loss = 0
+        adv_val_acc = 0
+        adv_val_n = 0
+        model.eval()
+        for i, (X, y) in enumerate(tqdm(val_loader)):
+            X, y = X.cuda(), y.cuda()
+            val_delta = torch.zeros(X.size(0), 3, 32, 32).cuda()
+            val_delta.requires_grad = True
+
+            val_output = model(X + val_delta)
+            val_loss = F.cross_entropy(val_output, y)
+            val_loss.backward()
+            val_grad = val_delta.grad.detach()
+            val_delta.data = torch.clamp(val_delta + alpha * torch.sign(val_grad), -epsilon, epsilon)
+            val_delta.data = torch.clamp(val_delta, lower_limit - X, upper_limit - X)
+
+            with torch.no_grad():
+                output = model(X + val_delta)
+                loss = F.cross_entropy(output, y)
+                adv_val_loss += loss.item() * y.size(0)
+                adv_val_acc += (output.max(1)[1] == y).sum().item()
+                adv_val_n += y.size(0)
+
+        results['adv_val_loss'].append(adv_val_loss / adv_val_n)
+        results['adv_val_acc'].append(adv_val_acc / adv_val_n)
+        logger.info(f"Epoch: {epoch}")
+        logger.info(f"Adversarial Validation Loss: {adv_val_loss / adv_val_n}")
+        logger.info(f"Adversarial Validation Acc: {adv_val_acc / adv_val_n}")
+
+
