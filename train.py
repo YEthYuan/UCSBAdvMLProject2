@@ -1,8 +1,10 @@
 import argparse
 import logging
 import os
+import time
 
 import torch
+from tqdm import tqdm
 
 from data_util import cifar10_dataloader
 from model_util import ResNet18
@@ -76,6 +78,10 @@ def main():
 
     epsilon = (args.eps / 255.) / std
     alpha = (args.alpha / 255.) / std
+    upper_limit = ((1 - mean) / std)
+    lower_limit = ((0 - mean) / std)
+    delta = torch.zeros(args.batch_size, 3, 32, 32).cuda()
+    delta.requires_grad = True
 
     model = ResNet18()
     # be lazy...
@@ -87,7 +93,80 @@ def main():
     prev_robust_acc = 0.
     best_pgd_acc = 0
     test_acc_best_pgd = 0
-    start_epoch = 0
 
+    results = {
+        "train_loss": [],
+        "train_acc": [],
+        "val_loss": [],
+        "val_acc": [],
+        "adv_val_loss": [],
+        "adv_val_acc": []
+    }
 
+    logger.info("Start training now!")
+    start_train_time = time.time()
 
+    for epoch in range(0, args.epochs):
+        logger.info(f"Epoch {epoch} starts ...")
+        logger.info("Training ...")
+        model.train()
+        train_loss = 0
+        train_acc = 0
+        train_n = 0
+        for i, (X, y) in enumerate(tqdm(train_loader)):
+            X = X.cuda()
+            y = y.cuda()
+            for j in range(len(epsilon)):
+                delta[:, j, :, :].uniform_(-epsilon[j][0][0].item(), epsilon[j][0][0].item())
+            delta.data = torch.clamp(delta, lower_limit - X, upper_limit - X)
+
+            if args.train_method == 'fat':
+                output = model(X + delta[:X.size(0)])
+                loss = F.cross_entropy(output, y)
+                loss.backward()
+                grad = delta.grad.detach()
+                delta.data = torch.clamp(delta + alpha * torch.sign(grad), -epsilon, epsilon)
+                delta.data[:X.size(0)] = torch.clamp(delta[:X.size(0)], lower_limit - X, upper_limit - X)
+
+            elif args.train_method == 'at':
+                for _ in range(args.attack_iters):
+                    output = model(X + delta)
+                    loss = criterion(output, y)
+                    loss.backward()
+                    grad = delta.grad.detach()
+                    delta.data = torch.clamp(delta + alpha * torch.sign(grad), -epsilon, epsilon)
+                    delta.data = torch.clamp(delta, lower_limit - X, upper_limit - X)
+                    delta.grad.zero_()
+
+            delta = delta.detach()
+
+            output = model(X + delta[:X.size(0)])
+            loss = criterion(output, y)
+            opt.zero_grad()
+            loss.backward()
+
+            opt.step()
+            train_loss += loss.item() * y.size(0)
+            train_acc += (output.max(1)[1] == y).sum().item()
+            train_n += y.size(0)
+            scheduler.step()
+
+        results['train_loss'].append(train_loss / train_n)
+        results['train_acc'].append(train_acc / train_n)
+        logger.info(f"Epoch: {epoch}")
+        logger.info(f"Train Loss: {train_loss / train_n}")
+        logger.info(f"Train Acc: {train_acc / train_n}")
+
+        logger.info("Evaluating the standard accuracy ...")
+        val_loss = 0
+        val_acc = 0
+        val_n = 0
+        model.eval()
+        with torch.no_grad():
+            for i, (X, y) in enumerate(tqdm(val_loader)):
+                X, y = X.cuda(), y.cuda()
+                output = model(X)
+                loss = F.cross_entropy(output, y)
+                val_loss += loss.item() * y.size(0)
+                val_acc += (output.max(1)[1] == y).sum().item()
+                val_n += y.size(0)
