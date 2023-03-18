@@ -4,6 +4,7 @@ import os
 import time
 
 import torch
+import copy
 from tqdm import tqdm
 
 from data_util import cifar10_dataloader
@@ -90,9 +91,8 @@ def main():
     lr_steps = args.epochs * len(train_loader)
     scheduler = torch.optim.lr_scheduler.MultiStepLR(opt, milestones=[lr_steps / 2, lr_steps * 3 / 4], gamma=0.1)
 
-    prev_robust_acc = 0.
-    best_pgd_acc = 0
-    test_acc_best_pgd = 0
+    best_adv_acc = 0
+    nat_acc_best_adv = 0
 
     results = {
         "epoch": [],
@@ -210,4 +210,23 @@ def main():
         logger.info(f"Adversarial Validation Loss: {adv_val_loss / adv_val_n}")
         logger.info(f"Adversarial Validation Acc: {adv_val_acc / adv_val_n}")
 
+        if adv_val_acc > best_adv_acc:
+            best_adv_acc = adv_val_acc
+            nat_acc_best_adv = val_acc
 
+            best_ckpt = {}
+            best_ckpt['state_dict'] = copy.deepcopy(model.state_dict())
+            best_ckpt['opt'] = copy.deepcopy(opt.state_dict())
+            best_ckpt['scheduler'] = copy.deepcopy(scheduler.state_dict())
+            best_ckpt['epoch'] = epoch
+            best_ckpt['adv_acc'] = adv_val_acc
+            best_ckpt['nat_acc'] = val_acc
+
+            torch.save(best_ckpt, os.path.join(args.save_dir, 'best_model.pth'))
+            logger.info(f"New best record saved at {os.path.join(args.save_dir, 'best_model.pth')}!")
+
+        logger.info(f"Epoch {epoch} done!")
+
+
+if __name__ == "__main__":
+    main()
