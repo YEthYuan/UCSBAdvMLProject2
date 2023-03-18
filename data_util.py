@@ -31,10 +31,12 @@ def cifar10_dataloader(batch_size=64, data_dir='./data/', val_ratio=0.1):
         transforms.RandomCrop(32, padding=4),
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
+        transforms.Normalize(mean=[0.4914, 0.4822, 0.4465], std=[0.2470, 0.2435, 0.2616])
     ])
 
     test_transform = transforms.Compose([
         transforms.ToTensor(),
+        transforms.Normalize(mean=[0.4914, 0.4822, 0.4465], std=[0.2470, 0.2435, 0.2616])
     ])
 
     train_size = int(50000 * (1 - val_ratio))
