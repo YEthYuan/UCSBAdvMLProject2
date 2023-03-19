@@ -40,12 +40,12 @@ def main():
     # Load data
     train_loader, val_loader, test_loader, norm_layer = data_util.cifar10_dataloader(data_dir=args.data_dir)
     model = model_util.ResNet18(num_classes=10)
-    model.normalize = norm_layer
+    # model.normalize = norm_layer
     # model.load(args.model_path, args.device)
     # model = model.to(args.device)
 
     checkpoint = torch.load(args.model_path)
-    model.load_state_dict(checkpoint['state_dict'], strict=False)
+    model.load_state_dict(checkpoint['state_dict'], strict=True)
     model = model.to(args.device)
 
     ## Make sure the model is in `eval` mode.
