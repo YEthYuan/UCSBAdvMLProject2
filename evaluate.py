@@ -33,14 +33,14 @@ def parse_args():
         "--attack_method", type=str, default="pgd", choices=['fgsm', 'pgd'], help="Adversarial perturbation generate method"
     )
     parser.add_argument(
-        "--loss_type", type=str, default="ce", choices=['ce', 'cw'], help="Loss type for attack"
+        "--loss_type", type=str, default="cw", choices=['ce', 'cw'], help="Loss type for attack"
     )
     parser.add_argument(
         '--data_dir', default='./data/', type=str, help="Folder to store downloaded dataset"
     )
     parser.add_argument(
         '--model_path',
-        default='/home/sw99/AdvTrain/out/at/best_model.pth',
+        default='/home/sw99/AdvTrain/out/fat/best_model.pth',
         # default='pgd10_eps8.pth',
         help='Filepath to the trained model'
     )
